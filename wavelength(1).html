@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1e3320">
+<title>Wavelength</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #1e3320;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    width: 100vw; height: 100dvh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    padding-bottom: 32px;
+    position: relative;
+  }
+
+  /* fond tableau plein écran derrière tout */
+  #bg-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #wheel-area { width: 100%; flex-shrink: 0; position: relative; z-index: 1; }
+  #wheel-svg  { width: 100%; display: block; touch-action: none; }
+
+  #bottom {
+    width: min(100vw, 480px); padding: 0 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    position: relative; z-index: 1;
+  }
+
+  /* bonhommes */
+  #figures-wrap {
+    position: relative; z-index: 1;
+    width: 340px; height: 191px;
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  #figures-wrap svg { overflow: visible; }
+
+  #score-pill {
+    height: 40px; padding: 0 24px; border-radius: 100px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 17px; font-weight: 600;
+    font-family: 'Caveat', cursive; letter-spacing: 0.04em;
+    opacity: 0; transition: opacity 0.25s, transform 0.25s;
+    transform: translateY(4px);
+    background: rgba(255,255,255,0.08); color: #e8f0e0;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  #score-pill.show { opacity: 1; transform: translateY(0); }
+
+  #controls { display: flex; gap: 10px; width: 100%; }
+  .btn {
+    flex: 1; height: 56px; border-radius: 14px; border: none;
+    font-family: 'Caveat', cursive; font-size: 20px; font-weight: 700;
+    letter-spacing: 0.04em; cursor: pointer;
+    transition: transform 0.1s, opacity 0.15s;
+  }
+  .btn:active { transform: scale(0.95); opacity: 0.8; }
+  #btn-new  { background: #d4e8a0; color: #1a2e1a; }
+  #btn-show { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); border: 1.5px solid rgba(255,255,255,0.25); }
+  #btn-show.open { color: #f0e080; border-color: #f0e080; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- FOND TABLEAU plein écran (SVG) -->
+  <svg id="bg-canvas" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="ct">
+        <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="4" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+    <rect width="100%" height="100%" fill="#1e3320"/>
+    <!-- écritures craie dans les zones libres du tableau -->
+
+    <!-- haut gauche (à gauche des bonhommes) -->
+    <text x="3vw"  y="8vh"  font-size="clamp(20px,5.5vw,28px)" transform="rotate(-4,3vw,8vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.55">A²</text>
+    <text x="2vw"  y="16vh" font-size="clamp(14px,3.8vw,20px)" transform="rotate(3,2vw,16vh)"    filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.38">a·a=a²</text>
+
+    <!-- haut droit (à droite des bonhommes) -->
+    <text x="72vw" y="7vh"  font-size="clamp(18px,5vw,26px)"   transform="rotate(4,72vw,7vh)"    filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.52">A+A=♡</text>
+    <text x="78vw" y="16vh" font-size="clamp(13px,3.5vw,19px)" transform="rotate(-3,78vw,16vh)"  filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.36">∞</text>
+
+    <!-- côté gauche de la roue (coins hors cercle) -->
+    <text x="1vw"  y="32vh" font-size="clamp(13px,3.5vw,19px)" transform="rotate(-5,1vw,32vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.32">♡</text>
+    <text x="0vw"  y="58vh" font-size="clamp(14px,3.8vw,20px)" transform="rotate(4,0vw,58vh)"    filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.3">A²+A²</text>
+
+    <!-- côté droit de la roue -->
+    <text x="84vw" y="38vh" font-size="clamp(13px,3.5vw,19px)" transform="rotate(-3,84vw,38vh)"  filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.33">A♡A</text>
+    <text x="86vw" y="55vh" font-size="clamp(12px,3.2vw,18px)" transform="rotate(5,86vw,55vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.28">A≈A</text>
+
+    <!-- bas gauche (sous la roue, à côté des boutons) -->
+    <text x="2vw"  y="76vh" font-size="clamp(15px,4vw,22px)"   transform="rotate(-3,2vw,76vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.42">lim a→♡</text>
+    <text x="1vw"  y="88vh" font-size="clamp(13px,3.5vw,19px)" transform="rotate(4,1vw,88vh)"    filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.32">∑a=♡</text>
+
+    <!-- bas droit -->
+    <text x="74vw" y="78vh" font-size="clamp(14px,3.8vw,21px)" transform="rotate(3,74vw,78vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.38">a²→∞</text>
+    <text x="76vw" y="90vh" font-size="clamp(12px,3.2vw,17px)" transform="rotate(-4,76vw,90vh)"  filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.28">∃ a+a</text>
+
+    <!-- bas centre (sous les boutons) -->
+    <text x="32vw" y="96vh" font-size="clamp(11px,3vw,16px)"   transform="rotate(2,32vw,96vh)"   filter="url(#ct)" font-family="Caveat" fill="white" opacity="0.25">A∩A=A</text>
+  </svg>
+
+  <!-- BONHOMMES -->
+  <div id="figures-wrap">
+    <svg viewBox="0 0 160 90" width="340" height="191" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+      <defs>
+        <filter id="cf">
+          <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="3" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+
+      <!-- ── Petite (cheveux longs) x=45 ── -->
+      <g opacity="0.88" filter="url(#cf)">
+        <!-- corps -->
+        <path d="M 45,70 Q 44,58 45,46" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- tête -->
+        <circle cx="45" cy="39" r="8" fill="#1e3320" stroke="white" stroke-width="1.8"/>
+        <!-- yeux -->
+        <circle cx="42.5" cy="38" r="1.2" fill="white"/>
+        <circle cx="47.5" cy="38" r="1.2" fill="white"/>
+        <!-- bouche sourire -->
+        <path d="M 42,41 Q 45,43.5 48,41" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <!-- cheveux longs mèches -->
+        <path d="M 38,35 Q 34,34 33,41 Q 32,50 34,56" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.75"/>
+        <path d="M 40,33 Q 37,28 36,35 Q 35,43 36,50" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.68"/>
+        <path d="M 45,31 Q 44,28 43,35 Q 42,43 43,49" stroke="white" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.62"/>
+        <path d="M 50,33 Q 53,28 53,35 Q 52,44 51,50" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.68"/>
+        <path d="M 52,35 Q 56,34 56,41 Q 56,50 54,56" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.75"/>
+        <!-- bras gauche -->
+        <path d="M 45,52 Q 37,49 33,44" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <!-- bras droit vers grand -->
+        <path d="M 45,52 Q 52,51 60,52" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <!-- jambes -->
+        <path d="M 45,70 Q 41,78 39,85" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M 45,70 Q 49,78 51,85" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </g>
+
+      <!-- ── Coeur ── -->
+      <path d="M 79,51 Q 79,47 82,47 Q 85,47 85,50 Q 85,47 88,47 Q 91,47 91,51 Q 91,55 85,59 Q 79,55 79,51 Z" fill="white" opacity="0.72"/>
+
+      <!-- ── Grand (cheveux bouclés) x=112 ── -->
+      <g opacity="0.9" filter="url(#cf)">
+        <!-- corps -->
+        <path d="M 112,66 Q 111,52 112,37" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <!-- tête -->
+        <circle cx="112" cy="28" r="10" fill="#1e3320" stroke="white" stroke-width="2"/>
+        <!-- yeux -->
+        <circle cx="108.5" cy="27" r="1.4" fill="white"/>
+        <circle cx="115.5" cy="27" r="1.4" fill="white"/>
+        <!-- bouche sourire -->
+        <path d="M 108,31 Q 112,34 116,31" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <!-- boucles courtes -->
+        <path d="M 102,24 Q 101,17 106,16 Q 109,15 111,18" stroke="white" stroke-width="1.7" fill="none" stroke-linecap="round" opacity="0.78"/>
+        <path d="M 106,21 Q 104,14 109,13 Q 112,12 114,16" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.72"/>
+        <path d="M 111,19 Q 111,13 115,12 Q 118,11 119,15" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.72"/>
+        <path d="M 116,21 Q 120,14 124,16 Q 126,19 123,24" stroke="white" stroke-width="1.7" fill="none" stroke-linecap="round" opacity="0.78"/>
+        <!-- bras gauche vers petite -->
+        <path d="M 112,44 Q 104,47 96,52" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- bras droit levé -->
+        <path d="M 112,44 Q 122,38 130,31" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- jambes -->
+        <path d="M 112,66 Q 107,75 104,84" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M 112,66 Q 117,75 120,84" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- ROUE -->
+  <div id="wheel-area">
+    <svg id="wheel-svg" viewBox="0 0 400 210" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- clip = exactement le demi-cercle de la roue -->
+        <clipPath id="wclip">
+          <path d="M200,200 L6,200 A194,194 0 0 1 394,200 Z"/>
+        </clipPath>
+      </defs>
+
+      <!-- fond roue -->
+      <path d="M200,200 L6,200 A194,194 0 0 1 394,200 Z" fill="#141f16"/>
+
+      <!-- zones colorées (clippées aussi pour propreté) -->
+      <g clip-path="url(#wclip)">
+        <path id="z1"  fill="#1c2e1e" d=""/>
+        <path id="z2l" fill="#2d4a8a" d=""/>
+        <path id="z2r" fill="#2d4a8a" d=""/>
+        <path id="z3l" fill="#b05a3a" d=""/>
+        <path id="z3r" fill="#b05a3a" d=""/>
+        <path id="z4"  fill="#c89828" d=""/>
+      </g>
+
+      <!-- rim + hub -->
+      <path d="M6,200 A194,194 0 0 1 394,200" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+      <circle cx="200" cy="200" r="42" fill="#141f16" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+
+      <!-- ticks -->
+      <g id="ticks" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+
+      <!-- volets : deux rects qui glissent, clippés au demi-cercle → jamais de débordement ni de gap -->
+      <g clip-path="url(#wclip)">
+        <rect id="shut-l" x="0"   y="0" width="201" height="210" fill="#141f16"/>
+        <rect id="shut-r" x="199" y="0" width="201" height="210" fill="#141f16"/>
+      </g>
+
+      <!-- aiguille toujours par-dessus -->
+      <polygon id="needle" points="" fill="#e8e6f4"/>
+      <circle cx="200" cy="200" r="12" fill="#e8e6f4"/>
+      <circle cx="200" cy="200" r="5"  fill="#141f16"/>
+    </svg>
+  </div>
+
+  <!-- BOTTOM -->
+  <div id="bottom">
+    <div id="score-pill">
+      <span id="s-dot" style="font-size:20px">●</span>
+      <span id="s-txt">—</span>
+    </div>
+    <div id="controls">
+      <button class="btn" id="btn-new"  onclick="newTarget()">Nouvelle cible</button>
+      <button class="btn" id="btn-show" onclick="toggleReveal()">Révéler</button>
+    </div>
+  </div>
+
+</div>
+<script>
+const CX=200, CY=200, R=192, RIN=42;
+let targetDeg=270, needleDeg=270, revealed=false, dragging=false;
+let shutProg=0, shutAnim=null;
+const $=id=>document.getElementById(id);
+const rad=d=>d*Math.PI/180;
+function pt(r,d){return{x:CX+r*Math.cos(rad(d)),y:CY+r*Math.sin(rad(d))};}
+
+function arc(rIn,rOut,a1,a2){
+  a1=Math.max(180,Math.min(360,a1));
+  a2=Math.max(180,Math.min(360,a2));
+  if(a2<=a1)return'';
+  const p1=pt(rIn,a1),p2=pt(rOut,a1),p3=pt(rOut,a2),p4=pt(rIn,a2);
+  const lg=(a2-a1)>180?1:0;
+  return`M${p1.x},${p1.y}L${p2.x},${p2.y}A${rOut},${rOut} 0 ${lg} 1 ${p3.x},${p3.y}L${p4.x},${p4.y}A${rIn},${rIn} 0 ${lg} 0 ${p1.x},${p1.y}Z`;
+}
+
+function drawZones(c){
+  $('z1').setAttribute('d', arc(RIN,R,180,360));
+  $('z2l').setAttribute('d',arc(RIN,R,c-20,c-10));
+  $('z2r').setAttribute('d',arc(RIN,R,c+10,c+20));
+  $('z3l').setAttribute('d',arc(RIN,R,c-10,c-4));
+  $('z3r').setAttribute('d',arc(RIN,R,c+4,c+10));
+  $('z4').setAttribute('d', arc(RIN,R,c-4,c+4));
+}
+function drawTargetLine(c){ /* stocké dans targetDeg, ligne créée au reveal */ }
+function drawNeedle(d){
+  const tip=pt(R-3,d),bl=pt(RIN+6,d-5),br=pt(RIN+6,d+5);
+  $('needle').setAttribute('points',`${tip.x},${tip.y} ${bl.x},${bl.y} ${br.x},${br.y}`);
+}
+function drawShutters(prog){
+  // Volet gauche glisse de x=0 vers x=-200 (sort par la gauche)
+  // Volet droit  glisse de x=200 vers x=400 (sort par la droite)
+  const offL = -prog * 200;
+  const offR =  prog * 200;
+  $('shut-l').setAttribute('x', offL);
+  $('shut-r').setAttribute('x', 199 + offR);
+}
+function animShut(toOpen, onDone){
+  if(shutAnim)cancelAnimationFrame(shutAnim);
+  const from=shutProg,to=toOpen?1:0,dur=420;
+  let start=null;
+  (function step(ts){
+    if(!start)start=ts;
+    const t=Math.min((ts-start)/dur,1);
+    const e=t<0.5?2*t*t:-1+(4-2*t)*t;
+    shutProg=from+(to-from)*e;
+    drawShutters(shutProg);
+    if(t<1)shutAnim=requestAnimationFrame(step);
+    else{shutProg=to;shutAnim=null;if(onDone)onDone();}
+  })(performance.now());
+}
+function drawTicks(){
+  const g=$('ticks');g.innerHTML='';
+  for(let d=180;d<=360;d+=10){
+    const a=pt(R+1,d),b=pt(R+8,d);
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',a.x);l.setAttribute('y1',a.y);
+    l.setAttribute('x2',b.x);l.setAttribute('y2',b.y);
+    g.appendChild(l);
+  }
+}
+function newTarget(){
+  targetDeg=192+Math.random()*156;
+  needleDeg=270;revealed=false;shutProg=0;
+  drawZones(targetDeg);drawTargetLine(targetDeg);drawNeedle(270);
+  drawShutters(0);
+  // target-line supprimée du DOM, sera recréée au reveal
+  const oldTl=$('target-line'); if(oldTl) oldTl.parentNode.removeChild(oldTl);
+  $('btn-show').textContent='Révéler';$('btn-show').classList.remove('open');
+  hidePill();
+}
+function showTargetLine(){
+  let tl=$('target-line');
+  if(!tl){
+    tl=document.createElementNS('http://www.w3.org/2000/svg','line');
+    tl.setAttribute('id','target-line');
+    tl.setAttribute('stroke','#f0c060');
+    tl.setAttribute('stroke-width','3.5');
+    tl.setAttribute('stroke-linecap','round');
+    $('needle').parentNode.insertBefore(tl,$('needle'));
+  }
+  const a=pt(RIN+4,targetDeg),b=pt(R-3,targetDeg);
+  tl.setAttribute('x1',a.x);tl.setAttribute('y1',a.y);
+  tl.setAttribute('x2',b.x);tl.setAttribute('y2',b.y);
+}
+function toggleReveal(){
+  revealed=!revealed;
+  if(revealed){
+    // Ligne créée seulement APRÈS la fin de l'animation
+    animShut(true, ()=>{ showTargetLine(); showScore(); });
+    $('btn-show').textContent='Cacher';$('btn-show').classList.add('open');
+  }else{
+    animShut(false, null);
+    const tl=$('target-line');
+    if(tl) tl.parentNode.removeChild(tl);
+    $('btn-show').textContent='Révéler';$('btn-show').classList.remove('open');
+    hidePill();
+  }
+}
+function score(){
+  let d=Math.abs(needleDeg-targetDeg)%360;
+  if(d>180)d=360-d;
+  if(d<=4) return{p:4,t:'Bullseye !',c:'#f0c060'};
+  if(d<=10)return{p:3,t:'Très proche',c:'#e07060'};
+  if(d<=20)return{p:2,t:'Proche',c:'#5a88d8'};
+  return       {p:1,t:'À côté',c:'#4a4870'};
+}
+function showScore(){
+  const s=score();
+  $('score-pill').style.borderColor=s.c+'80';
+  $('s-dot').style.color=s.c;
+  $('s-txt').textContent=`${s.p} pts — ${s.t}`;
+  $('score-pill').classList.add('show');
+}
+function hidePill(){$('score-pill').classList.remove('show');}
+
+// drag
+function svgXY(e){
+  const rect=$('wheel-svg').getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return{x:((src.clientX-rect.left)/rect.width)*400,
+         y:((src.clientY-rect.top)/rect.height)*210};
+}
+function toDeg(x,y){let d=Math.atan2(y-CY,x-CX)*180/Math.PI;return d<0?d+360:d;}
+function clamp(d){if(d>=180&&d<=360)return d;return d>90?180:360;}
+
+$('wheel-svg').addEventListener('touchstart',e=>{
+  const{x,y}=svgXY(e);
+  if(Math.hypot(x-CX,y-CY)>RIN){dragging=true;e.preventDefault();}
+},{passive:false});
+$('wheel-svg').addEventListener('mousedown',e=>{
+  const{x,y}=svgXY(e);
+  if(Math.hypot(x-CX,y-CY)>RIN){dragging=true;e.preventDefault();}
+});
+document.addEventListener('touchmove',e=>{
+  if(!dragging)return;e.preventDefault();
+  const{x,y}=svgXY(e);
+  needleDeg=clamp(toDeg(x,y));drawNeedle(needleDeg);
+  if(revealed)showScore();
+},{passive:false});
+document.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  const{x,y}=svgXY(e);
+  needleDeg=clamp(toDeg(x,y));drawNeedle(needleDeg);
+  if(revealed)showScore();
+});
+document.addEventListener('touchend',()=>dragging=false);
+document.addEventListener('mouseup',()=>dragging=false);
+
+drawTicks();
+newTarget();
+</script>
+</body>
+</html>
